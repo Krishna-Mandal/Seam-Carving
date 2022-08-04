@@ -15,8 +15,7 @@ class Counter(override var count: Int) : ICounter {
 
 // Do not change the code above
 
-class Iterator(counter: ICounter) : ICounter by counter // Your code here
-{
+class Iterator(counter: ICounter) : ICounter by counter { // Your code here
     fun next() {
         increaseCount()
     }
