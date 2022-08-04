@@ -6,18 +6,18 @@ import java.awt.image.BufferedImage.TYPE_INT_RGB
 import java.io.File
 import javax.imageio.ImageIO
 
-fun main() {
-    val width = readln().toInt()
-    val height = readln().toInt()
-    val outFile = File(readln())
+fun main(args:Array<String>) {
+    val inFile = File(args[1])
+    val outFile = File(args[3])
+    val inImage = ImageIO.read(inFile)
 
-    val bufferedImage = BufferedImage(width, height, TYPE_INT_RGB)
-    val graphics = bufferedImage.createGraphics()
-    graphics.color = Color.BLACK
-    graphics.drawRect(0, 0, width - 1 , height - 1)
-    graphics.color = Color.RED
-    graphics.drawLine(0, 0, width - 1, height - 1)
-    graphics.drawLine(width - 1, 0, 0, height - 1)
+    for (x in 0 until inImage.width) {
+        for (y in 0 until inImage.height) {
+            val color = Color(inImage.getRGB(x, y))
+            val newColor = Color(255 - color.red, 255 - color.green, 255 - color.blue)
+            inImage.setRGB(x, y, newColor.rgb)
+        }
+    }
 
-    ImageIO.write(bufferedImage, "png", outFile)
+    ImageIO.write(inImage, "png", outFile)
 }
