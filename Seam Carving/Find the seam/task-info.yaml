@@ -271,6 +271,18 @@ files:
 - name: test/trees.png
   visible: false
   learner_created: false
-feedback_link: https://hyperskill.org/projects/100/stages/553/implement#comment
-status: Unchecked
-record: -1
+- name: test/blue-seam.png
+  visible: true
+  learner_created: true
+- name: test/trees-seam.png
+  visible: true
+  learner_created: true
+- name: test/small-seam.png
+  visible: true
+  learner_created: true
+feedback_link: https://hyperskill.org/learn/step/9018#comment
+status: Solved
+feedback:
+  message: Congratulations!
+  time: Thu, 04 Aug 2022 21:40:58 UTC
+record: 4

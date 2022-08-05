@@ -4,53 +4,119 @@ import java.awt.Color
 import java.awt.image.BufferedImage
 import java.io.File
 import javax.imageio.ImageIO
+import kotlin.math.pow
 import kotlin.math.sqrt
 
-fun main(args:Array<String>) {
-    val inFile = File(args[1])
-    val outFile = File(args[3])
-    val inImage = ImageIO.read(inFile)
-    var maxEnergy: Double = Double.MIN_VALUE
-    val energy = Array(inImage.width) {DoubleArray(inImage.height)}
+class SeamCarver(sourceName: String) {
+    private val sourceFile = ImageIO.read(File(sourceName))
+    private var width = sourceFile.width
+    private var height = sourceFile.height
+    private var src = MutableList(height) { mutableListOf<Color>() }
+    private var isTransposed = false
 
-    for (x in 0 until inImage.width) {
-        for (y in 0 until inImage.height) {
+    init {
+        // fill an array with Color()s based on pixels, not worrying about memory/performance for now
+        for (y in 0 until height)
+            for (x in 0 until width)
+                src[y] += Color(sourceFile.getRGB(x, y))
+    }
 
-            val currEnergy = energy(x, y, inImage)
-            energy[x][y] = currEnergy
-            if (currEnergy > maxEnergy) {
-                maxEnergy = currEnergy
+    // calculate the energy for each pixel and return the energy matrix
+    private fun calculateEnergy(): MutableList<MutableList<Double>> {
+        fun pow2(i: Int) = i.toDouble().pow(2)
+        operator fun Color.minus(o: Color) = pow2(red - o.red) + pow2(green - o.green) + pow2(blue - o.blue)
+
+        val energy = MutableList(height) { mutableListOf<Double>() }
+
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                // coercing pixels on the border of the image to the inside of the border
+                val dX = src[y][x.coerceIn(1, width - 2) - 1] - src[y][x.coerceIn(1, width - 2) + 1]
+                val dY = src[y.coerceIn(1, height - 2) - 1][x] - src[y.coerceIn(1, height - 2) + 1][x]
+                energy[y] += sqrt(dX + dY)
             }
         }
+        return energy
     }
 
-    for (x in 0 until inImage.width) {
-        for (y in 0 until inImage.height) {
-            val currEnergy = energy[x][y]
-            val intensity = intensity(currEnergy, maxEnergy)
-            inImage.setRGB(x, y, Color(intensity, intensity, intensity).rgb)
+    // transposing the array back and forth so we can use the same algorithm for both horizontal and vertical seams
+    private fun transpose() {
+        val newSrc = MutableList(src[0].size) { MutableList(src.size) { Color(0, 0, 0) } }
 
+        for (y in 0 until height)
+            for (x in 0 until width)
+                newSrc[x][y] = src[y][x]
+
+        src = newSrc
+        height = src.size
+        width = src[0].size
+        isTransposed = !isTransposed
+    }
+
+    fun removeVerticalSeam() = removeSeam()
+    fun removeHorizontalSeam() {
+        if (!isTransposed) transpose()
+        removeSeam()
+    }
+
+    private fun removeSeam() {
+        val energy = calculateEnergy()
+
+        // calculate the Shortest Path Values
+        val spv = MutableList(energy.size) { MutableList(energy[0].size) { 0.0 } }
+
+        // energy values for the first row are identical to the original values
+        spv[0] = energy[0]
+
+        // for all other rows, for each pixel, new energy is equal to its own energy
+        // plus the minimum of the three above, or two if we are at the horizontal border
+        for (y in 1 until height)
+            for (x in 0 until width)
+                spv[y][x] = energy[y][x] +
+                        minOf(
+                            spv[y - 1][(x - 1).coerceAtLeast(0)],
+                            spv[y - 1][x],
+                            spv[y - 1][(x + 1).coerceAtMost(width - 1)]
+                        )
+
+        // find the path with the lowest energy
+        var x = spv[height - 1].indexOf(spv[height - 1].minOf { it })
+
+        // remove the bottom pixel of the seam
+        src[height - 1].removeAt(x)
+
+        // travel up the lowest energy path to y = 0
+        for (y in height - 2 downTo 0) {
+            // using a map to preserve the indexes
+            val map = mutableMapOf(x to spv[y][x])
+            if (x > 0) map[x - 1] = spv[y][x - 1]
+            if (x < width - 1) map[x + 1] = spv[y][x + 1]
+            x = map.minByOrNull { it.value }!!.key
+
+            // remove the pixel we found in this row
+            src[y].removeAt(x)
         }
+
+        width--
     }
 
+    fun writeImage(destName: String) {
+        if (isTransposed) transpose()
+        val dest = BufferedImage(width, height, BufferedImage.TYPE_INT_RGB)
 
-    ImageIO.write(inImage, "png", outFile)
+        for (x in 0 until width)
+            for (y in 0 until height)
+                dest.setRGB(x, y, src[y][x].rgb)
+
+        ImageIO.write(dest, "png", File(destName))
+    }
 }
 
-fun grad2(axis: String, x: Int, y: Int, image: BufferedImage): Double {
-    val pixel1 = Color(image.getRGB(if (axis == "x") x - 1 else x, if (axis == "y") y - 1 else y))
-    val pixel2 = Color(image.getRGB(if (axis == "x") x + 1 else x, if (axis == "y") y + 1 else y))
-    val rDiff = pixel2.red - pixel1.red
-    val gDiff = pixel2.green - pixel1.green
-    val bDiff = pixel2.blue - pixel1.blue
-    return (rDiff * rDiff + gDiff * gDiff + bDiff * bDiff).toDouble()
-}
+fun main(args: Array<String>) {
+    val carver = SeamCarver(args[1])
 
-fun energy(x: Int, y: Int, im: BufferedImage): Double {
-    return sqrt(grad2("x", x.coerceIn(1, im.width - 2), y, im) + grad2("y", x, y.coerceIn(1, im.height - 2), im))
-}
+    repeat(args[5].toInt()) { carver.removeVerticalSeam() }
+    repeat(args[7].toInt()) { carver.removeHorizontalSeam() }
 
-fun intensity(energy: Double, maxEnergyValue: Double): Int {
-    val intensity = (255.0 * energy / maxEnergyValue).toInt()
-    return intensity
+    carver.writeImage(args[3])
 }

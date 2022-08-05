@@ -166,9 +166,9 @@ files:
 - name: test/trees.png
   visible: false
   learner_created: false
-feedback_link: https://hyperskill.org/projects/100/stages/552/implement#comment
+feedback_link: https://hyperskill.org/learn/step/9017#comment
 status: Solved
 feedback:
   message: Congratulations!
   time: Thu, 04 Aug 2022 14:36:50 UTC
-record: -1
+record: 3
